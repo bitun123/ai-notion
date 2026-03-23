@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="icons/icon48.png" alt="Brain" class="logo">
+      <h1>Second Brain</h1>
+    </header>
+    
+    <div class="content">
+      <div id="page-info">
+        <span id="page-type" class="badge">Detecting...</span>
+        <h2 id="page-title">Loading...</h2>
+      </div>
+      
+      <button id="save-btn">Save to Brain</button>
+      
+      <div id="status" class="hidden">
+        <div class="spinner"></div>
+        <p>Saving...</p>
+      </div>
+
+      <div id="success" class="hidden">
+        <div class="check-icon">✓</div>
+        <p>Saved successfully!</p>
+      </div>
+
+      <div id="error" class="hidden">
+        <p>Error saving page.</p>
+        <button id="retry-btn">Retry</button>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
