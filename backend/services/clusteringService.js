@@ -1,4 +1,4 @@
-const Link = require('../models/Link');
+const Link = require('../db/Link');
 const { ChatMistralAI } = require("@langchain/mistralai");
 const { PromptTemplate } = require("@langchain/core/prompts");
 const { StringOutputParser } = require("@langchain/core/output_parsers");

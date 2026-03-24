@@ -1,4 +1,4 @@
-const Link = require("../models/Link");
+const Link = require("../db/Link");
 const { cosineSimilarity } = require("./similarityService");
 
 /**

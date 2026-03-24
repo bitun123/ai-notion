@@ -1,6 +1,6 @@
 const { MistralAIEmbeddings } = require("@langchain/mistralai");
 const { Pinecone } = require("@pinecone-database/pinecone");
-const Link = require("../models/Link");
+const Link = require("../db/Link");
 
 /**
  * Initializes Pinecone client and gets the index.
