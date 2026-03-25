@@ -1,27 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import KnowledgeGraph from '../components/KnowledgeGraph';
-import { getGraphData, getLinks } from '../api';
-import ItemDetailModal from '../components/modals/ItemDetailModal';
+import { useGraph } from '../../hooks/useGraph';
+import { getLinks } from '../../../../features/content/api/contentApi';
+import ItemDetailModal from '../../../../features/content/ui/modals/ItemDetailModal';
 
-const GraphView = () => {
-  const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
-  const [loading, setLoading] = useState(true);
+const GraphPage = () => {
+  const { graphData, loading, error } = useGraph();
   const [selectedItem, setSelectedItem] = useState(null);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const data = await getGraphData();
-        setGraphData(data);
-      } catch (err) {
-        console.error('Failed to fetch graph data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
 
   const handleNodeClick = async (node) => {
     try {
@@ -44,6 +29,12 @@ const GraphView = () => {
           Visualize the semantic relationships between your saved items.
         </p>
       </header>
+
+      {error && (
+        <div className="mb-8 p-4 bg-red-50 text-red-600 rounded-2xl border border-red-100">
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
@@ -68,4 +59,4 @@ const GraphView = () => {
   );
 };
 
-export default GraphView;
+export default GraphPage;

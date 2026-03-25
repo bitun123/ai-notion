@@ -1,43 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { getClusteredLinks, rebuildClusters } from '../api';
-import ItemCard from '../components/ItemCard';
-import ItemDetailModal from '../components/modals/ItemDetailModal';
-import { SkeletonList } from '../components/Skeleton';
+import React, { useState } from 'react';
+import { useTopics } from '../../hooks/useTopics';
+import ItemCard from '../../../content/ui/components/ItemCard';
+import ItemDetailModal from '../../../content/ui/modals/ItemDetailModal';
+import { SkeletonList } from '../../../../shared/ui/components/Skeleton';
 
-const TopicsView = () => {
-  const [clusters, setClusters] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [rebuilding, setRebuilding] = useState(false);
+const TopicsPage = () => {
+  const { clusters, loading, rebuilding, error, rebuild } = useTopics();
   const [selectedItem, setSelectedItem] = useState(null);
-
-  const fetchClusters = async () => {
-    try {
-      setLoading(true);
-      const data = await getClusteredLinks();
-      setClusters(data);
-    } catch (err) {
-      console.error('Failed to fetch clusters:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchClusters();
-  }, []);
-
-  const handleRebuild = async () => {
-    try {
-      setRebuilding(true);
-      await rebuildClusters();
-      await fetchClusters();
-    } catch (err) {
-      console.error('Rebuild failed:', err);
-      alert('Failed to rebuild topics.');
-    } finally {
-      setRebuilding(false);
-    }
-  };
 
   const topics = Object.keys(clusters);
 
@@ -54,7 +23,7 @@ const TopicsView = () => {
         </div>
         
         <button 
-          onClick={handleRebuild}
+          onClick={rebuild}
           disabled={rebuilding}
           className={`flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95 ${rebuilding ? 'opacity-70 cursor-not-allowed' : ''}`}
         >
@@ -71,6 +40,12 @@ const TopicsView = () => {
           )}
         </button>
       </header>
+
+      {error && (
+        <div className="mb-8 p-4 bg-red-50 text-red-600 rounded-2xl border border-red-100 italic">
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-12">
@@ -110,7 +85,7 @@ const TopicsView = () => {
       ) : (
         <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
           <p className="text-slate-500 font-medium mb-4">No topics generated yet.</p>
-          <button onClick={handleRebuild} className="text-indigo-600 font-bold hover:underline">
+          <button onClick={rebuild} className="text-indigo-600 font-bold hover:underline">
             Run initial clustering now
           </button>
         </div>
@@ -126,4 +101,4 @@ const TopicsView = () => {
   );
 };
 
-export default TopicsView;
+export default TopicsPage;

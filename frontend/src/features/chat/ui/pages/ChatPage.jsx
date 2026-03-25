@@ -1,29 +1,13 @@
 import React, { useState } from 'react';
-import { askQuestion } from '../api';
+import { useChat } from '../../hooks/useChat';
 
-const AskView = () => {
+const ChatPage = () => {
   const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState(null);
-  const [sources, setSources] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const { answer, sources, loading, error, ask } = useChat();
 
   const handleAsk = async (e) => {
     e.preventDefault();
-    if (!question.trim()) return;
-    setLoading(true);
-    setAnswer(null);
-    setSources([]);
-    setError(null);
-    try {
-      const result = await askQuestion(question);
-      setAnswer(result.answer);
-      setSources(result.sources || []);
-    } catch (err) {
-      setError('Could not connect to AI. Make sure the backend is running and MISTRAL_API_KEY is set.');
-    } finally {
-      setLoading(false);
-    }
+    await ask(question);
   };
 
   return (
@@ -101,4 +85,4 @@ const AskView = () => {
   );
 };
 
-export default AskView;
+export default ChatPage;

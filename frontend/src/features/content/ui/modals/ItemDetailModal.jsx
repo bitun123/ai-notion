@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getCollections, addToCollection, getHighlights, createHighlight, deleteHighlight, getRelatedItems } from '../../api';
-import ItemCard from '../ItemCard';
+import { getCollections, addToCollection, getHighlights, createHighlight, deleteHighlight, getRelatedItems } from '../../api/contentApi';
+import ItemCard from '../components/ItemCard';
 
 const ItemDetailModal = ({ item, onClose, onDelete }) => {
   const [relatedItems, setRelatedItems] = useState([]);

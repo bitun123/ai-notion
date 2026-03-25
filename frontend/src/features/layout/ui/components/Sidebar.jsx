@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { getCollections, createCollection } from '../api';
+import { NavLink, useLocation } from 'react-router-dom';
+import { getCollections, createCollection } from '../../content/api/contentApi';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const [collections, setCollections] = useState([]);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
 
   const fetchCollections = async () => {
     try {

@@ -2,15 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import SaveInput from '../components/SaveInput';
 import ItemList from '../components/ItemList';
-import { SkeletonList } from '../components/Skeleton';
-import { getLinks, saveLink, searchLinks, getResurfacedItems, deleteLink } from '../api';
-import ItemDetailModal from '../components/modals/ItemDetailModal';
+import { SkeletonList } from '../../../../shared/ui/components/Skeleton';
+import ItemDetailModal from '../modals/ItemDetailModal';
+import { useContent } from '../../hooks/useContent';
+import { useManageContent } from '../../hooks/useManageContent';
+import { useContentState } from '../../state/ContentContext';
+import { getCollections } from '../../api/contentApi';
 
-const Dashboard = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching, setFilteredItems, filteredItems }) => {
-  const [items, setItems] = useState([]);
-  const [resurfacedItems, setResurfacedItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const DashboardPage = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching, setFilteredItems, filteredItems }) => {
+  const { items, resurfacedItems, loading, error } = useContentState();
+  const { fetchLinks } = useContent(null, searchQuery, isSemanticSearch); // Base fetch logic
+  const { handleDelete, handleSaveLink } = useManageContent();
+  
   const [selectedItem, setSelectedItem] = useState(null);
   const [currentCollection, setCurrentCollection] = useState(null);
   
@@ -18,93 +21,45 @@ const Dashboard = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching,
   const queryParams = new URLSearchParams(location.search);
   const collectionId = queryParams.get('collection');
 
-  const fetchLinks = async () => {
-    try {
-      setLoading(true);
-      
-      let linksData;
+  // Specific collection fetching logic
+  useEffect(() => {
+    const fetchCollectionInfo = async () => {
       if (collectionId) {
-        const { getCollectionLinks, getCollections } = await import('../api');
-        linksData = await getCollectionLinks(collectionId);
-        const collections = await getCollections();
-        setCurrentCollection(collections.find(c => c._id === collectionId));
+        try {
+          const collections = await getCollections();
+          setCurrentCollection(collections.find(c => c._id === collectionId));
+        } catch (err) {
+          console.error("Error fetching collection info:", err);
+        }
       } else {
-        const { getLinks } = await import('../api');
-        linksData = await getLinks();
         setCurrentCollection(null);
       }
-
-      const { getResurfacedItems } = await import('../api');
-      const resurfacedData = await getResurfacedItems();
-      
-      setItems(linksData);
-      setResurfacedItems(resurfacedData);
-      if (!searchQuery) setFilteredItems(linksData);
-      setError(null);
-    } catch (err) {
-      console.error('Failed to fetch links:', err);
-      setError('Could not connect to the backend server. Make sure MongoDB and Node are running.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchLinks();
+    };
+    fetchCollectionInfo();
   }, [collectionId]);
 
-  // Sync searching logic
+  // Re-run fetch when collectionId changes
   useEffect(() => {
-    if (isSemanticSearch && searchQuery.length > 2) {
-      const delayDebounceFn = setTimeout(async () => {
-        try {
-          setIsSearching(true);
-          const results = await searchLinks(searchQuery);
-          setFilteredItems(results);
-        } catch (err) {
-          console.error('Semantic search failed:', err);
-        } finally {
-          setIsSearching(false);
-        }
-      }, 500);
+    fetchLinks();
+  }, [collectionId, fetchLinks]);
 
-      return () => clearTimeout(delayDebounceFn);
-    } else {
-      const results = items.filter(item =>
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.url.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredItems(results);
-    }
-  }, [searchQuery, items, isSemanticSearch, setIsSearching, setFilteredItems]);
-
-  // Called by SaveInput for URL/video saves
-  const handleSave = async (url) => {
+  const onSave = async (url) => {
     if (url) {
-      try {
-        await saveLink(url);
-      } catch (err) {
-        console.error('Failed to save link:', err);
+      const success = await handleSaveLink(url);
+      if (!success) {
         alert('Failed to save the URL.');
         return;
       }
     }
-    // Refresh list (also called after PDF upload with url=null)
     fetchLinks();
   };
 
-  // Called by ItemCard delete button
-  const handleDelete = async (id) => {
-    try {
-      await deleteLink(id);
-      // Optimistically remove from state
-      setItems(prev => prev.filter(item => item._id !== id));
-      setFilteredItems(prev => prev.filter(item => item._id !== id));
-      setResurfacedItems(prev => prev.filter(item => item._id !== id));
-      if (selectedItem?._id === id) setSelectedItem(null);
-    } catch (err) {
-      console.error('Failed to delete link:', err);
+  const onDelete = async (id) => {
+    const success = await handleDelete(id);
+    if (!success) {
       alert('Failed to delete item. Please try again.');
+    } else {
+      if (selectedItem?._id === id) setSelectedItem(null);
     }
   };
 
@@ -119,7 +74,7 @@ const Dashboard = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching,
         </p>
       </header>
 
-      <SaveInput onSave={handleSave} />
+      <SaveInput onSave={onSave} />
       
       {!searchQuery && resurfacedItems.length > 0 && (
         <section className="mb-12">
@@ -163,14 +118,14 @@ const Dashboard = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching,
       {loading ? (
         <SkeletonList />
       ) : (
-        <ItemList items={filteredItems} onView={setSelectedItem} onDelete={handleDelete} />
+        <ItemList items={filteredItems} onView={setSelectedItem} onDelete={onDelete} />
       )}
 
       {selectedItem && (
         <ItemDetailModal 
           item={selectedItem} 
           onClose={() => setSelectedItem(null)}
-          onDelete={handleDelete}
+          onDelete={onDelete}
         />
       )}
 
@@ -183,4 +138,4 @@ const Dashboard = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching,
   );
 };
 
-export default Dashboard;
+export default DashboardPage;

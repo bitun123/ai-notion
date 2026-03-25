@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { uploadPdf } from '../api';
+import { uploadPdf } from '../../api/contentApi';
 
 const TABS = [
   { id: 'url',   label: 'Paste URL',    icon: '🔗' },
