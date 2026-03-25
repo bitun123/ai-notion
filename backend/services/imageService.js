@@ -1,37 +1,57 @@
-const { OpenAI } = require('openai');
+const { ChatMistralAI } = require('@langchain/mistralai');
 
 /**
- * Uses OpenAI Vision (if key available) to describe an image.
+ * imageService.js
+ * Generates a text description of an image using Mistral's vision capability.
+ * Uses mistral-small-latest which supports image URLs in messages.
+ * No OpenAI key required — only MISTRAL_API_KEY.
  */
 async function extractImage(url) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const title = url.split('/').pop() || "Image";
+  const title = url.split('/').pop().split('?')[0] || 'Image';
+  const apiKey = process.env.MISTRAL_API_KEY;
 
   if (!apiKey) {
-    return { title, content: "No OpenAI API key found for image analysis." };
+    return {
+      title,
+      content: `Image saved: ${url}. No Mistral API key found for image analysis.`
+    };
   }
 
   try {
-    const openai = new OpenAI({ apiKey });
-    const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "What is in this image? Provide a detailed description and extract any readable text." },
-            { type: "image_url", image_url: { url: url } },
-          ],
-        },
-      ],
-      max_tokens: 300,
+    const model = new ChatMistralAI({
+      apiKey,
+      modelName: 'mistral-small-latest',
+      temperature: 0
     });
 
-    const description = response.choices[0].message.content;
-    return { title, content: description };
+    const response = await model.invoke([
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: 'Describe this image in detail. Extract any visible text. Provide topics, context, and what the image represents. Be thorough so this description can be used for semantic search.'
+          },
+          {
+            type: 'image_url',
+            image_url: { url }
+          }
+        ]
+      }
+    ]);
+
+    const description = response.content || '';
+    return {
+      title: title.substring(0, 300),
+      content: description
+    };
   } catch (err) {
     console.warn(`Image analysis failed for ${url}: ${err.message}`);
-    return { title, content: "Could not analyze this image." };
+    // Graceful fallback: store URL-derived metadata so it can still be searched
+    return {
+      title: title.substring(0, 300),
+      content: `Image from: ${url}. Analysis unavailable: ${err.message}`
+    };
   }
 }
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getCollections, addToCollection, getHighlights, createHighlight, deleteHighlight, getRelatedItems } from '../../api';
 import ItemCard from '../ItemCard';
 
-const ItemDetailModal = ({ item, onClose }) => {
+const ItemDetailModal = ({ item, onClose, onDelete }) => {
   const [relatedItems, setRelatedItems] = useState([]);
   const [collections, setCollections] = useState([]);
   const [highlights, setHighlights] = useState([]);
@@ -304,12 +304,30 @@ const ItemDetailModal = ({ item, onClose }) => {
             )}
           </div>
           
-          <button 
-            onClick={onClose}
-            className="mt-auto hidden md:block w-full py-3 bg-slate-900 text-white text-sm font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
-          >
-            Close Details
-          </button>
+          <div className="mt-auto flex flex-col gap-2">
+            {onDelete && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Delete "${item.title}"?`)) {
+                    onDelete(item._id);
+                    onClose();
+                  }
+                }}
+                className="hidden md:flex w-full py-3 items-center justify-center gap-2 bg-red-50 text-red-600 border border-red-100 text-sm font-bold rounded-2xl hover:bg-red-100 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete Item
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="hidden md:block w-full py-3 bg-slate-900 text-white text-sm font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+            >
+              Close Details
+            </button>
+          </div>
         </div>
       </div>
     </div>

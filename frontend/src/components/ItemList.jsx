@@ -1,7 +1,7 @@
 import React from 'react';
 import ItemCard from './ItemCard';
 
-const ItemList = ({ items, onView }) => {
+const ItemList = ({ items, onView, onDelete }) => {
   if (items.length === 0) {
     return (
       <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
@@ -13,7 +13,7 @@ const ItemList = ({ items, onView }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {items.map((item) => (
-        <ItemCard key={item._id} item={item} onView={onView} />
+        <ItemCard key={item._id} item={item} onView={onView} onDelete={onDelete} />
       ))}
     </div>
   );

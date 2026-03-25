@@ -13,11 +13,12 @@ const ask = async (req, res) => {
     const { PromptTemplate } = require('@langchain/core/prompts');
     const { StringOutputParser } = require('@langchain/core/output_parsers');
 
-    // 1. Semantic search for relevant context
+    // ── 1. Retrieve relevant chunks via semantic search ────────────────────
     let contextLinks = [];
     try {
-      contextLinks = await performSearch(question);
-    } catch {
+      contextLinks = await performSearch(question, 5);
+    } catch (searchErr) {
+      console.warn('Search failed, loading recent links as fallback:', searchErr.message);
       contextLinks = isConnected()
         ? await Link.find().sort({ createdAt: -1 }).limit(5)
         : getMemLinks().slice(0, 5);
@@ -25,15 +26,22 @@ const ask = async (req, res) => {
 
     if (contextLinks.length === 0) {
       return res.json({
-        answer: "I couldn't find any relevant information in your knowledge base. Try saving some articles first!",
+        answer: "I couldn't find any relevant information in your knowledge base. Try saving some articles, PDFs, or images first!",
         sources: []
       });
     }
 
+    // ── 2. Build RAG context from matched chunk text ───────────────────────
+    // Prefer matchedChunkText (chunk-level precision) over raw content
     const context = contextLinks
-      .map((l, i) => `[${i + 1}] ${l.title}\n${l.content || ''}`)
+      .map((l, i) => {
+        const chunkSnippet = l.matchedChunkText
+          ? l.matchedChunkText
+          : (l.content || '').substring(0, 600);
+        return `[${i + 1}] Source: ${l.title} (${l.type || 'article'})\nURL: ${l.url}\n\n${chunkSnippet}`;
+      })
       .join('\n\n---\n\n')
-      .substring(0, 4000);
+      .substring(0, 6000); // Mistral context window budget
 
     if (!MISTRAL_API_KEY) {
       return res.json({
@@ -42,26 +50,53 @@ const ask = async (req, res) => {
       });
     }
 
-    const model = new ChatMistralAI({ apiKey: MISTRAL_API_KEY, modelName: 'mistral-small-latest', temperature: 0.3 });
-    const prompt = PromptTemplate.fromTemplate(`
-You are a helpful AI assistant for a "Second Brain" application. 
-Answer the user's question ONLY based on the provided knowledge base context.
-If the answer isn't in the context, say "I don't have information about that in your knowledge base."
-Keep the answer concise, helpful, and insightful.
+    // ── 3. Generate answer using Mistral with RAG context ─────────────────
+    const model = new ChatMistralAI({
+      apiKey: MISTRAL_API_KEY,
+      modelName: 'mistral-small-latest',
+      temperature: 0.3
+    });
 
-Context from knowledge base:
+    const prompt = PromptTemplate.fromTemplate(`
+You are a helpful AI assistant for a "Second Brain" application.
+Your task is to answer the user's question using ONLY the provided knowledge base context below.
+The context may include articles, PDF excerpts, and image descriptions.
+
+Rules:
+- Answer only from the provided context. Do not use external knowledge.
+- If the answer isn't in the context, say exactly: "I don't have information about that in your knowledge base."
+- Be concise, clear, and insightful.
+- Cite the source number (e.g. [1], [2]) when referencing specific information.
+- If multiple sources support the answer, mention all relevant ones.
+
+Knowledge Base Context:
 {context}
 
-Question: {question}
+User Question: {question}
 
 Answer:`);
 
     const chain = prompt.pipe(model).pipe(new StringOutputParser());
     const answer = await chain.invoke({ context, question });
 
+    // ── 4. Deduplicate sources by URL ─────────────────────────────────────
+    const seen = new Set();
+    const sources = contextLinks
+      .filter(l => {
+        if (seen.has(l.url)) return false;
+        seen.add(l.url);
+        return true;
+      })
+      .map(l => ({
+        _id: l._id,
+        title: l.title,
+        url: l.url,
+        type: l.type || 'article'
+      }));
+
     res.json({
       answer: answer.trim(),
-      sources: contextLinks.map(l => ({ _id: l._id, title: l.title, url: l.url }))
+      sources
     });
   } catch (err) {
     console.error('RAG Error:', err);

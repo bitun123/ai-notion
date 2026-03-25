@@ -34,6 +34,10 @@ const LinkSchema = new mongoose.Schema({
     enum: ['article', 'pdf', 'image'],
     default: 'article'
   },
+  chunkCount: {
+    type: Number,
+    default: 0
+  },
   createdAt: {
     type: Date,
     default: Date.now

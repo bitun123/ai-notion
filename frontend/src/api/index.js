@@ -12,6 +12,20 @@ export const saveLink = async (url, title) => {
   return response.data;
 };
 
+export const uploadPdf = async (file) => {
+  const formData = new FormData();
+  formData.append('pdf', file);
+  const response = await axios.post(`${API_URL}/links/upload-pdf`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return response.data;
+};
+
+export const deleteLink = async (id) => {
+  const response = await axios.delete(`${API_URL}/links/${id}`);
+  return response.data;
+};
+
 export const searchLinks = async (query) => {
   const response = await axios.post(`${API_URL}/search`, { query });
   return response.data.results;

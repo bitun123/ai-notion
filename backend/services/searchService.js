@@ -1,65 +1,83 @@
-const { MistralAIEmbeddings } = require("@langchain/mistralai");
-const { Pinecone } = require("@pinecone-database/pinecone");
-const Link = require("../db/Link");
-const { cosineSimilarity } = require("./similarityService");
+/**
+ * searchService.js
+ * Semantic search via Pinecone chunk vectors (Mistral embeddings).
+ * Fallback: cosine similarity on Link.embedding stored in MongoDB.
+ *
+ * Chunks live only in Pinecone — no MongoDB chunk collection queried here.
+ */
+
+const { embedText } = require('./embeddingService');
+const { searchChunksInPinecone, cosineSimilarity } = require('./similarityService');
+const Link = require('../db/Link');
 
 /**
- * Performs semantic search using Pinecone with a MongoDB fallback.
+ * Performs semantic search over Pinecone chunk vectors.
+ * Falls back to Link-level cosine similarity when Pinecone is unavailable.
+ *
+ * @param {string} queryText - The user's search query.
+ * @param {number} topLinks  - Max unique links to return (default 5).
+ * @returns {Promise<Array>} - Link objects enriched with score + matchedChunkText.
  */
-async function performSearch(queryText) {
+async function performSearch(queryText, topLinks = 5) {
+  if (!queryText || queryText.trim().length === 0) return [];
+
   const apiKey = process.env.MISTRAL_API_KEY;
-  if (!apiKey) throw new Error("MISTRAL_API_KEY missing");
+  if (!apiKey) throw new Error('MISTRAL_API_KEY missing');
 
-  try {
-    const embeddings = new MistralAIEmbeddings({
-      apiKey: apiKey,
-      modelName: "mistral-embed"
-    });
+  // ── 1. Embed the query with Mistral ───────────────────────────────────────
+  const queryVector = await embedText(queryText);
 
-    const queryVector = await embeddings.embedQuery(queryText);
+  // ── 2. Search Pinecone chunk vectors ────────────────────────────────────
+  const pineconeHits = await searchChunksInPinecone(queryVector, topLinks * 3);
 
-    // 1. Try Pinecone Search
-    if (process.env.PINECONE_API_KEY && process.env.PINECONE_INDEX) {
-      try {
-        const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-        const index = pc.index(process.env.PINECONE_INDEX);
-        
-        const queryResponse = await index.query({
-          vector: queryVector,
-          topK: 5,
-          includeMetadata: false
-        });
-
-        const ids = queryResponse.matches.map(m => m.id);
-        const results = await Link.find({ _id: { $in: ids } });
-        
-        return results
-          .map(link => ({
-            ...link.toObject(),
-            score: queryResponse.matches.find(m => m.id === String(link._id))?.score || 0
-          }))
-          .sort((a, b) => b.score - a.score);
-
-      } catch (err) {
-        console.error("Pinecone search failed, falling back to MongoDB:", err.message);
+  if (pineconeHits && pineconeHits.length > 0) {
+    // Group chunk hits by parent linkId — keep best scoring chunk per link
+    const linkMap = new Map();
+    for (const hit of pineconeHits) {
+      if (!hit.linkId) continue;
+      const current = linkMap.get(hit.linkId);
+      if (!current || hit.score > current.score) {
+        linkMap.set(hit.linkId, hit);
       }
     }
 
-    // 2. Fallback: Manual search in MongoDB
+    const ranked = Array.from(linkMap.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topLinks);
+
+    if (ranked.length === 0) return [];
+
+    // Fetch full Link documents from MongoDB
+    const linkIds = ranked.map(r => r.linkId);
+    const links = await Link.find({ _id: { $in: linkIds } });
+
+    return links
+      .map(link => {
+        const meta = linkMap.get(String(link._id));
+        return {
+          ...link.toObject(),
+          score: meta?.score || 0,
+          matchedChunkText: meta?.chunkText || ''
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+  }
+
+  // ── 3. Fallback: cosine similarity on Link.embedding (single vector per link) ──
+  console.warn('Pinecone unavailable — falling back to Link embedding cosine search.');
+  try {
     const allLinks = await Link.find({ embedding: { $exists: true, $ne: [] } });
-    const scoredResults = allLinks
+    return allLinks
       .map(link => ({
         ...link.toObject(),
-        score: link.embedding ? cosineSimilarity(queryVector, link.embedding) : 0
+        score: cosineSimilarity(queryVector, link.embedding),
+        matchedChunkText: link.content ? link.content.substring(0, 400) : ''
       }))
-      .filter(item => item.score > 0.6)
+      .filter(l => l.score > 0.5)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
-
-    return scoredResults;
-
+      .slice(0, topLinks);
   } catch (err) {
-    console.error("Search Service Error:", err.message);
+    console.error('Link-level fallback search error:', err.message);
     return [];
   }
 }

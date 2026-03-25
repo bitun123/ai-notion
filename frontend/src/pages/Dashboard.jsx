@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import SaveInput from '../components/SaveInput';
 import ItemList from '../components/ItemList';
 import { SkeletonList } from '../components/Skeleton';
-import { getLinks, saveLink, searchLinks, getResurfacedItems } from '../api';
+import { getLinks, saveLink, searchLinks, getResurfacedItems, deleteLink } from '../api';
 import ItemDetailModal from '../components/modals/ItemDetailModal';
 
 const Dashboard = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching, setFilteredItems, filteredItems }) => {
@@ -78,13 +78,33 @@ const Dashboard = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching,
     }
   }, [searchQuery, items, isSemanticSearch, setIsSearching, setFilteredItems]);
 
+  // Called by SaveInput for URL/video saves
   const handleSave = async (url) => {
+    if (url) {
+      try {
+        await saveLink(url);
+      } catch (err) {
+        console.error('Failed to save link:', err);
+        alert('Failed to save the URL.');
+        return;
+      }
+    }
+    // Refresh list (also called after PDF upload with url=null)
+    fetchLinks();
+  };
+
+  // Called by ItemCard delete button
+  const handleDelete = async (id) => {
     try {
-      await saveLink(url);
-      fetchLinks();
+      await deleteLink(id);
+      // Optimistically remove from state
+      setItems(prev => prev.filter(item => item._id !== id));
+      setFilteredItems(prev => prev.filter(item => item._id !== id));
+      setResurfacedItems(prev => prev.filter(item => item._id !== id));
+      if (selectedItem?._id === id) setSelectedItem(null);
     } catch (err) {
-      console.error('Failed to save link:', err);
-      alert('Failed to save the URL.');
+      console.error('Failed to delete link:', err);
+      alert('Failed to delete item. Please try again.');
     }
   };
 
@@ -143,13 +163,14 @@ const Dashboard = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching,
       {loading ? (
         <SkeletonList />
       ) : (
-        <ItemList items={filteredItems} onView={setSelectedItem} />
+        <ItemList items={filteredItems} onView={setSelectedItem} onDelete={handleDelete} />
       )}
 
       {selectedItem && (
         <ItemDetailModal 
           item={selectedItem} 
-          onClose={() => setSelectedItem(null)} 
+          onClose={() => setSelectedItem(null)}
+          onDelete={handleDelete}
         />
       )}
 
