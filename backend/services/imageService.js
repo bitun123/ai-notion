@@ -20,7 +20,7 @@ async function extractImage(url) {
   try {
     const model = new ChatMistralAI({
       apiKey,
-      modelName: 'mistral-small-latest',
+      modelName: 'pixtral-12b-2409', // Mistral's vision-capable model
       temperature: 0
     });
 

@@ -22,16 +22,31 @@ async function extractVideo(url) {
       const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
       const { data } = await axios.get(oembedUrl, { timeout: 6000 });
       const title = data.title || filename;
+      
+      let transcriptText = '';
+      try {
+        console.log(`🎬 Fetching YouTube transcript for ${url}...`);
+        const ytModule = await import('youtube-transcript');
+        const YoutubeTranscript = ytModule.YoutubeTranscript || ytModule.default.YoutubeTranscript;
+        const transcript = await YoutubeTranscript.fetchTranscript(url);
+        transcriptText = transcript.map(t => t.text).join(' ');
+        console.log(`✅ YouTube transcript mapped (${transcriptText.length} chars)`);
+      } catch (err) {
+        console.warn(`⚠️ YouTube transcript failed for ${url}: ${err.message}`);
+      }
+
       const content = [
         `YouTube Video by ${data.author_name || 'Unknown'}`,
         data.title ? `Title: ${data.title}` : '',
         `Channel: ${data.author_name || 'Unknown'}`,
         `URL: ${url}`,
-        `This is a YouTube video. The content describes: ${data.title || url}`
+        `--- Spoken Transcript ---`,
+        transcriptText || `This is a YouTube video. The content describes: ${data.title || url}`
       ].filter(Boolean).join('\n');
+      
       return { title, content };
     } catch (err) {
-      console.warn(`YouTube oEmbed failed for ${url}: ${err.message}`);
+      console.warn(`YouTube extraction failed for ${url}: ${err.message}`);
     }
   }
 
