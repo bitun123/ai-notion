@@ -80,7 +80,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               className={({ isActive }) => `
                 w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all
                 ${isActive 
-                  ? 'bg-slate-200/50 text-indigo-600 shadow-sm border border-slate-200/30' 
+                  ? 'bg-slate-200/50 text-indigo-600 shadow-sm ' 
                   : 'text-slate-500 hover:bg-slate-200/30 hover:text-slate-800'}
               `}
             >
@@ -112,7 +112,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 autoFocus
                 type="text"
                 placeholder="Name..."
-                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full bg-white  rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
                 value={newCollectionName}
                 onChange={(e) => setNewCollectionName(e.target.value)}
               />
@@ -128,7 +128,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 className={({ isActive }) => `
                   w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all
                   ${location.search === `?collection=${coll._id}`
-                    ? 'bg-slate-200/50 text-indigo-600 font-bold border border-slate-200/30' 
+                    ? 'bg-slate-200/50 text-indigo-600 font-bold ' 
                     : 'text-slate-500 hover:bg-slate-200/30 hover:text-slate-800 font-medium'}
                 `}
               >
