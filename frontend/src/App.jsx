@@ -13,7 +13,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSemanticSearch, setIsSemanticSearch] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [filteredItems, setFilteredItems] = useState([]);
+
 
   return (
     <ContentProvider>
@@ -36,8 +36,6 @@ function App() {
                   isSemanticSearch={isSemanticSearch}
                   isSearching={isSearching}
                   setIsSearching={setIsSearching}
-                  filteredItems={filteredItems}
-                  setFilteredItems={setFilteredItems}
                 />
               } />
               <Route path="/graph" element={<GraphPage />} />

@@ -58,27 +58,59 @@ const getClusteredLinks = async (req, res) => {
  *   Stores only the first chunk embedding on the Link as local fallback.
  */
 async function runRagPipeline(savedLink) {
-  try {
-    const { _id, title, url, content, type } = savedLink;
+  const { _id, title, url, content, type } = savedLink;
+  console.log(`🚀 Starting RAG pipeline for: "${title}" (${_id})`);
 
-    const rawChunks = chunkByType(content || '', type || 'article', { title, url });
-    if (rawChunks.length === 0) {
-      console.warn(`RAG: no chunks for link ${_id}`);
+  try {
+    // 1. Validation
+    if (!content || content.trim().length < 10) {
+      console.warn(`⚠️ RAG Skip: Content too short or empty for link ${_id}`);
       return;
     }
 
-    const embeddedChunks = await embedChunks(rawChunks);
-    await upsertChunksToPinecone(savedLink, embeddedChunks);
+    if (content.includes('[PROTECTED CONTENT]') || content.includes('[EXTRACTION ERROR]')) {
+      console.warn(`⚠️ RAG Skip: Protected or invalid content found for link ${_id}`);
+      return;
+    }
 
+    // 2. Chunking
+    console.log(`📦 Chunking content for link ${_id}...`);
+    const rawChunks = chunkByType(content || '', type || 'article', { title, url });
+    if (!rawChunks || rawChunks.length === 0) {
+      console.warn(`⚠️ RAG Skip: No chunks generated for link ${_id}`);
+      return;
+    }
+    console.log(`✅ Generated ${rawChunks.length} chunks.`);
+
+    // 3. Embedding
+    console.log(`🧬 Generating embeddings for ${rawChunks.length} chunks via Mistral...`);
+    const embeddedChunks = await embedChunks(rawChunks);
+    if (!embeddedChunks || embeddedChunks.length === 0) {
+      console.warn(`⚠️ RAG Skip: No valid embeddings generated for link ${_id}`);
+      return;
+    }
+    console.log(`✅ Successfully embedded ${embeddedChunks.length} chunks.`);
+
+    // 4. Pinecone Upsert
+    console.log(`📤 Upserting to Pinecone for link ${_id}...`);
+    const upsertedCount = await upsertChunksToPinecone(savedLink, embeddedChunks);
+
+    if (upsertedCount === false || upsertedCount === 0) {
+      console.warn(`❌ RAG Pipeline Halted: Pinecone upsert failed or returned 0 for link ${_id}`);
+      return;
+    }
+
+    // 5. Database Update (Sync metadata)
     const firstEmbedding = embeddedChunks[0]?.embedding || [];
     await Link.findByIdAndUpdate(_id, {
-      chunkCount: embeddedChunks.length,
+      chunkCount: upsertedCount,
       embedding: firstEmbedding
     });
 
-    console.log(`✅ RAG done for "${title}" — ${embeddedChunks.length} chunk(s)`);
+    console.log(`✨ RAG Pipeline Complete for "${title}" — ${upsertedCount} chunk(s) stored.`);
   } catch (err) {
-    console.error('RAG pipeline error:', err.message);
+    console.error(`❌ RAG Pipeline Failed for ${_id}:`, err.message);
+    // Pipeline is non-blocking, so we just log and continue
   }
 }
 

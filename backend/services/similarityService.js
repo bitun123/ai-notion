@@ -14,9 +14,20 @@ const Link = require('../db/Link');
  * Returns an initialized Pinecone index or null if credentials are missing.
  */
 async function getPineconeIndex() {
-  if (!process.env.PINECONE_API_KEY || !process.env.PINECONE_INDEX) return null;
-  const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-  return pc.index(process.env.PINECONE_INDEX);
+  const apiKey = process.env.PINECONE_API_KEY;
+  const indexName = process.env.PINECONE_INDEX;
+
+  if (!apiKey || !indexName) return null;
+
+  try {
+    const pc = new Pinecone({ apiKey });
+    // Note: .index() is a reference. Validating existence can be slow,
+    // so we handle 404s during actual operations instead.
+    return pc.index(indexName);
+  } catch (err) {
+    console.error('Pinecone initialization failed:', err.message);
+    return null;
+  }
 }
 
 /**
@@ -27,16 +38,20 @@ async function getPineconeIndex() {
  * @param {Array<{ text: string, chunkIndex: number, embedding: number[] }>} embeddedChunks
  */
 async function upsertChunksToPinecone(link, embeddedChunks) {
-  if (!embeddedChunks || embeddedChunks.length === 0) return;
+  const linkId = String(link?._id || 'unknown');
+  if (!embeddedChunks || embeddedChunks.length === 0) {
+    console.log(`ℹ️ No embedded chunks to upsert for link: ${linkId}`);
+    return false;
+  }
 
   const index = await getPineconeIndex();
   if (!index) {
-    console.warn('Pinecone credentials missing — skipping vector upsert.');
-    return;
+    console.warn(`⚠️ Pinecone index not available — skipping vector upsert for ${link?._id}`);
+    return false;
   }
 
   const vectors = embeddedChunks
-    .filter(c => c.embedding && c.embedding.length > 0)
+    .filter(c => Array.isArray(c.embedding) && c.embedding.length === 1024)
     .map(c => ({
       // Unique ID per chunk: {linkId}_{chunkIndex}
       id: `${String(link._id)}_${c.chunkIndex}`,
@@ -47,21 +62,62 @@ async function upsertChunksToPinecone(link, embeddedChunks) {
         url: link.url || '',
         type: link.type || 'article',
         chunkIndex: c.chunkIndex,
-        chunkText: c.text.substring(0, 500) // Pinecone metadata limit
+        chunkText: (c.text || '').substring(0, 500) // Pinecone metadata limit
       }
     }));
 
-  if (vectors.length === 0) return;
+  if (vectors.length === 0) {
+    console.warn(`⚠️ RAG Skip: No valid vectors (1024 dims) found in embeddedChunks for link: ${linkId}`);
+    return false;
+  }
+
+  console.log(`\n==================================================`);
+  console.log(`📡 PINECONE: Preparing to upsert ${vectors.length} vectors for link ${linkId}`);
+  console.log(`==================================================`);
 
   try {
-    // Pinecone upsert in batches of 100 (API limit)
-    for (let i = 0; i < vectors.length; i += 100) {
-      await index.upsert(vectors.slice(i, i + 100));
+    // Final sanity check on records
+    const validVectors = vectors.filter(v => 
+      v.id && 
+      Array.isArray(v.values) && 
+      v.values.length === 1024 &&
+      !v.values.some(isNaN)
+    );
+
+    if (validVectors.length === 0) {
+      console.error(`❌ PINECONE: All ${vectors.length} vectors failed final validation! Skipping upsert.`);
+      return false;
     }
-    console.log(`✅ Upserted ${vectors.length} chunk vector(s) for link: ${link._id}`);
+
+    if (validVectors.length !== vectors.length) {
+      console.warn(`⚠️ PINECONE: ${vectors.length - validVectors.length} vectors were invalid and removed.`);
+    }
+
+    // Pinecone upsert in batches of 100
+    let upsertedCount = 0;
+    for (let i = 0; i < validVectors.length; i += 100) {
+      const batch = validVectors.slice(i, i + 100);
+      
+      console.log(`   🔸 PINECONE: Sending batch of ${batch.length} vectors...`);
+      
+      // ABSOLUTE GUARD: Never call upsert with empty array
+      if (batch.length > 0) {
+        await index.upsert(batch);
+        upsertedCount += batch.length;
+      } else {
+        console.warn(`   ⚠️ PINECONE: Batch at index ${i} is empty. Skipping.`);
+      }
+    }
+    console.log(`✅ PINECONE: Successfully stored ${upsertedCount} chunk(s) for ${linkId}.`);
+    console.log(`==================================================\n`);
+    return upsertedCount;
   } catch (err) {
-    console.error('Pinecone upsert error:', err.message);
-    throw err;
+    if (err.message.includes('404')) {
+      console.error(`❌ Pinecone Error: Index "${process.env.PINECONE_INDEX}" not found (404). Please check your configuration.`);
+    } else {
+      console.error('Pinecone upsert error:', err.message);
+    }
+    return false;
   }
 }
 

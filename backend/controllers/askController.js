@@ -77,7 +77,13 @@ User Question: {question}
 Answer:`);
 
     const chain = prompt.pipe(model).pipe(new StringOutputParser());
-    const answer = await chain.invoke({ context, question });
+    
+    // Enforce an absolute 15-second timeout on Mistral inference
+    const invokePromise = chain.invoke({ context, question });
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('AI inference timed out (15s)')), 15000)
+    );
+    const answer = await Promise.race([invokePromise, timeoutPromise]);
 
     // ── 4. Deduplicate sources by URL ─────────────────────────────────────
     const seen = new Set();

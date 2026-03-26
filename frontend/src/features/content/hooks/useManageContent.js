@@ -6,7 +6,9 @@ export const useManageContent = () => {
 
   const handleSaveLink = async (url) => {
     try {
-      await saveLink(url);
+      const newLink = await saveLink(url);
+      setItems(prev => [newLink, ...prev]);
+      setFilteredItems(prev => [newLink, ...prev]);
       return true;
     } catch (err) {
       console.error('Failed to save link:', err);
@@ -16,7 +18,9 @@ export const useManageContent = () => {
 
   const handleUploadPdf = async (file) => {
     try {
-      await uploadPdf(file);
+      const newLink = await uploadPdf(file);
+      setItems(prev => [newLink, ...prev]);
+      setFilteredItems(prev => [newLink, ...prev]);
       return true;
     } catch (err) {
       console.error('Failed to upload PDF:', err);

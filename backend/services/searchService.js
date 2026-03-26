@@ -24,8 +24,12 @@ async function performSearch(queryText, topLinks = 5) {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey) throw new Error('MISTRAL_API_KEY missing');
 
-  // ── 1. Embed the query with Mistral ───────────────────────────────────────
-  const queryVector = await embedText(queryText);
+  // ── 1. Embed the query with Mistral (WITH TIMEOUT) ──────────────────────
+  const embedPromise = embedText(queryText);
+  const timeoutPromise = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Embedding request timed out API hang')), 8000)
+  );
+  const queryVector = await Promise.race([embedPromise, timeoutPromise]);
 
   // ── 2. Search Pinecone chunk vectors ────────────────────────────────────
   const pineconeHits = await searchChunksInPinecone(queryVector, topLinks * 3);

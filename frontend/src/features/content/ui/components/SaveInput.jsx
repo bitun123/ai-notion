@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { uploadPdf } from '../../api/contentApi';
 
 const TABS = [
   { id: 'url',   label: 'Paste URL',    icon: '🔗' },
@@ -7,7 +6,7 @@ const TABS = [
   { id: 'pdf',   label: 'Upload PDF',   icon: '📄' },
 ];
 
-const SaveInput = ({ onSave }) => {
+const SaveInput = ({ onSave, onUpload }) => {
   const [activeTab, setActiveTab] = useState('url');
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -44,13 +43,15 @@ const SaveInput = ({ onSave }) => {
     setPdfError('');
     setLoading(true);
     try {
-      await uploadPdf(pdfFile);
+      if (onUpload) {
+        const success = await onUpload(pdfFile);
+        if (!success) throw new Error('Upload failed. Please try again.');
+      }
       setPdfFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       showSuccess('PDF uploaded! Content extracted and processing.');
-      await onSave(null); // trigger list refresh without URL
     } catch (err) {
-      setPdfError(err.response?.data?.message || 'Upload failed. Please try again.');
+      setPdfError(err.message || 'Upload failed. Please try again.');
     } finally {
       setLoading(false);
     }

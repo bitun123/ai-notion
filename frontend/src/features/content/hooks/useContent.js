@@ -56,10 +56,13 @@ export const useContent = (collectionId, searchQuery, isSemanticSearch) => {
 
       return () => clearTimeout(delayDebounceFn);
     } else {
-      const results = items.filter(item =>
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.url.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const query = (searchQuery || '').toLowerCase();
+      const results = items.filter(item => {
+        const titleMatch = (item.title || '').toLowerCase().includes(query);
+        const urlMatch = (item.url || '').toLowerCase().includes(query);
+        const contentMatch = (item.content || '').toLowerCase().includes(query);
+        return titleMatch || urlMatch || contentMatch;
+      });
       setFilteredItems(results);
     }
   }, [searchQuery, items, isSemanticSearch, setIsSearching, setFilteredItems]);

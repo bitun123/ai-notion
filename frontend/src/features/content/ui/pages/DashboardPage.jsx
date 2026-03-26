@@ -9,8 +9,8 @@ import { useManageContent } from '../../hooks/useManageContent';
 import { useContentState } from '../../state/ContentContext';
 import { getCollections } from '../../api/contentApi';
 
-const DashboardPage = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching, setFilteredItems, filteredItems }) => {
-  const { items, resurfacedItems, loading, error } = useContentState();
+const DashboardPage = ({ searchQuery, isSemanticSearch, setIsSearching, isSearching }) => {
+  const { items, resurfacedItems, loading, error, filteredItems, setFilteredItems } = useContentState();
   const { fetchLinks } = useContent(null, searchQuery, isSemanticSearch); // Base fetch logic
   const { handleDelete, handleSaveLink } = useManageContent();
   
@@ -48,10 +48,20 @@ const DashboardPage = ({ searchQuery, isSemanticSearch, setIsSearching, isSearch
       const success = await handleSaveLink(url);
       if (!success) {
         alert('Failed to save the URL.');
-        return;
       }
+      // UI state updates natively via the hook!
     }
-    fetchLinks();
+  };
+
+  const onUpload = async (file) => {
+    if (file) {
+      const success = await handleUploadPdf(file);
+      if (!success) {
+        alert('Failed to upload PDF.');
+      }
+      return success;
+    }
+    return false;
   };
 
   const onDelete = async (id) => {
@@ -74,7 +84,7 @@ const DashboardPage = ({ searchQuery, isSemanticSearch, setIsSearching, isSearch
         </p>
       </header>
 
-      <SaveInput onSave={onSave} />
+      <SaveInput onSave={onSave} onUpload={onUpload} />
       
       {!searchQuery && resurfacedItems.length > 0 && (
         <section className="mb-12">

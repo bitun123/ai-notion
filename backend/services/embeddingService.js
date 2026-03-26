@@ -31,7 +31,13 @@ async function embedText(text) {
     throw new Error('Cannot embed empty text');
   }
   const model = getEmbeddingModel();
-  return await model.embedQuery(text.trim());
+  const vector = await model.embedQuery(text.trim());
+
+  // Validation: Mistral embed should be 1024 dimensions
+  if (!vector || vector.length !== 1024) {
+    throw new Error(`Invalid embedding generated: expected 1024 dims, got ${vector?.length || 0}`);
+  }
+  return vector;
 }
 
 /**
@@ -53,24 +59,30 @@ async function embedChunks(chunks) {
     try {
       const embeddings = await model.embedDocuments(texts);
       batch.forEach((chunk, idx) => {
-        results.push({ ...chunk, embedding: embeddings[idx] });
+        const vector = embeddings[idx];
+        if (vector && vector.length === 1024) {
+          results.push({ ...chunk, embedding: vector });
+        } else {
+          console.warn(`Malformed embedding in batch for chunk ${chunk.chunkIndex}`);
+        }
       });
     } catch (err) {
       console.error(`Embedding batch ${i / BATCH_SIZE + 1} failed:`, err.message);
       // Fallback: try embedding one by one to isolate failures
       for (const chunk of batch) {
         try {
-          const embedding = await model.embedQuery(chunk.text.trim());
-          results.push({ ...chunk, embedding });
+          const vector = await embedText(chunk.text);
+          results.push({ ...chunk, embedding: vector });
         } catch (singleErr) {
           console.error(`Single embed failed for chunkIndex ${chunk.chunkIndex}:`, singleErr.message);
-          results.push({ ...chunk, embedding: [] });
+         
         }
       }
     }
   }
 
-  return results;
+
+  return results.filter(r => Array.isArray(r.embedding) && r.embedding.length === 1024);
 }
 
 module.exports = { embedText, embedChunks };

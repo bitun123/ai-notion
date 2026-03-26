@@ -12,29 +12,30 @@ async function detectContentType(url) {
   // ── Extension-based detection (fastest) ─────────────────────────────────
   if (lowerUrl.endsWith('.pdf')) return 'pdf';
   if (/\.(jpg|jpeg|png|gif|webp|bmp|svg|tiff|avif)$/.test(lowerUrl)) return 'image';
-  if (/\.(mp4|webm|mov|avi|mkv|m4v|ogv|flv|wmv)$/.test(lowerUrl)) return 'video';
+  const extension = url.split(/[?#]/)[0].split('.').pop().toLowerCase();
+  
+  // Extension-based detection
+  if (['pdf'].includes(extension)) return 'pdf';
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(extension)) return 'image';
+  if (['mp4', 'webm', 'ogg', 'mov', 'avi'].includes(extension)) return 'video';
 
-  // ── Domain-based detection ───────────────────────────────────────────────
-  if (
-    lowerUrl.includes('youtube.com') ||
-    lowerUrl.includes('youtu.be') ||
-    lowerUrl.includes('vimeo.com') ||
-    lowerUrl.includes('dailymotion.com') ||
-    lowerUrl.includes('twitch.tv')
-  ) return 'video';
-
-  // ── HTTP HEAD request for Content-Type ──────────────────────────────────
+  // Content-type based detection via HEAD request
   try {
-    const response = await axios.head(url, {
-      timeout: 4000,
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+    const response = await axios.head(url, { 
+      timeout: 3000, 
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      validateStatus: (status) => status < 400
     });
+    
     const contentType = response.headers['content-type'] || '';
+    console.log(`📡 Type Detection: ${url} -> ${contentType}`);
+
     if (contentType.includes('application/pdf')) return 'pdf';
-    if (contentType.startsWith('image/')) return 'image';
-    if (contentType.startsWith('video/')) return 'video';
+    if (contentType.includes('image/')) return 'image';
+    if (contentType.includes('video/')) return 'video';
   } catch (err) {
-    console.warn(`Type detection HEAD failed for ${url}: ${err.message}`);
+    // If HEAD fails, we default to article for generic web URLs
+    // console.log(`Type detection failed for ${url}, defaulting to article.`);
   }
 
   return 'article';
