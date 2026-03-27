@@ -40,6 +40,9 @@ async function extractPdfFromBuffer(buffer, filename = 'PDF Document') {
   }
 }
 
+
+
+
 /**
  * Core PDF parsing — shared between URL and buffer extraction.
  * @param {Buffer|ArrayBuffer} data

@@ -1,13 +1,10 @@
-const { extractContent } = require('../services/contentService');
-const { runRagPipeline } = require('../services/ragService');
-const { handleTagging } = require('../services/tagService');
-const { saveLink } = require('../repositories/linkRepository');
-const { getAllLinks } = require('../repositories/linkRepository');
-const { deleteChunksFromPinecone } = require('../services/similarityService');
-const Link = require('../db/Link');
-
-
-
+const { extractContent } = require("../services/contentService");
+const { runRagPipeline } = require("../services/ragService");
+const { handleTagging } = require("../services/tagService");
+const { saveLink } = require("../repositories/linkRepository");
+const { getAllLinks } = require("../repositories/linkRepository");
+const { deleteChunksFromPinecone } = require("../services/similarityService");
+const Link = require("../db/Link");
 
 const saveLinkController = async (req, res) => {
   try {
@@ -20,24 +17,36 @@ const saveLinkController = async (req, res) => {
       url,
       content: result.content,
       type: result.type,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
 
     // async background jobs
-    handleTagging(saved._id, result.title, result.content);
-    runRagPipeline(saved);
+    await handleTagging(saved._id, result.title, result.content);
+    await runRagPipeline(saved);
 
-    res.status(201).json(saved);
+    const results = await Link.findById(saved._id);
+
+    res.status(201).json({
+      message: "Link saved successfully",
+      link: {
+        title: results.title,
+        url: results.url,
+        content: results.content,
+        tags: results.tags,
+        type: results.type,
+      },
+    });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 };
 
+
+
 const getLinksController = async (req, res) => {
   const links = await getAllLinks();
   res.json(links);
 };
-
 
 
 
@@ -52,5 +61,8 @@ const deleteLinkController = async (req, res) => {
   res.json({ success: true });
 };
 
-
-module.exports = { saveLinkController, getLinksController, deleteLinkController };
+module.exports = {
+  saveLinkController,
+  getLinksController,
+  deleteLinkController,
+};
